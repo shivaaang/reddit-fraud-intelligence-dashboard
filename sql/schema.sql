@@ -3,7 +3,7 @@
 -- ============================================================
 
 -- ============================================================
--- PHASE 1: Raw posts from Reddit
+-- Raw posts from Reddit
 -- ============================================================
 CREATE TABLE IF NOT EXISTS raw_posts (
     -- Reddit identifiers
@@ -36,29 +36,27 @@ CREATE TABLE IF NOT EXISTS raw_posts (
     search_query        TEXT,
     collected_at        TIMESTAMP DEFAULT NOW(),
 
-    -- LLM Pass 1: Relevance filtering (populated in Phase 2)
-    is_relevant         BOOLEAN,
-    relevance_confidence REAL,
-    relevance_topic_hint TEXT,
-    relevance_language  TEXT,
-    relevance_category  TEXT,
-    relevance_filtered_at TIMESTAMP,
-
-    -- Processing flags
-    comments_fetched    BOOLEAN DEFAULT FALSE,
-    classification_done BOOLEAN DEFAULT FALSE,
-
     -- Pre-filter flag (skipped before LLM pass)
-    pre_filtered_out    BOOLEAN DEFAULT FALSE
+    pre_filtered_out    BOOLEAN DEFAULT FALSE,
+
+    -- Pass 1: Boolean routing (is_fraud / is_idv)
+    is_fraud            BOOLEAN,
+    is_idv              BOOLEAN,
+    refilter_confidence REAL,
+    refilter_done       BOOLEAN DEFAULT FALSE,
+
+    -- Comment collection flag
+    comments_fetched    BOOLEAN DEFAULT FALSE
 );
 
 CREATE INDEX IF NOT EXISTS idx_raw_posts_subreddit ON raw_posts(subreddit);
 CREATE INDEX IF NOT EXISTS idx_raw_posts_created ON raw_posts(created_utc);
-CREATE INDEX IF NOT EXISTS idx_raw_posts_relevant ON raw_posts(is_relevant);
 CREATE INDEX IF NOT EXISTS idx_raw_posts_score ON raw_posts(score);
+CREATE INDEX IF NOT EXISTS idx_raw_posts_fraud ON raw_posts(is_fraud);
+CREATE INDEX IF NOT EXISTS idx_raw_posts_idv ON raw_posts(is_idv);
 
 -- ============================================================
--- PHASE 3: Comments (only fetched for relevant posts)
+-- Comments (fetched for relevant posts)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS comments (
     comment_id          TEXT PRIMARY KEY,
@@ -87,54 +85,48 @@ CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_comments_score ON comments(score DESC);
 
 -- ============================================================
--- PHASE 4: Deep classification results
+-- Pass 2: Fraud deep classification
 -- ============================================================
-CREATE TABLE IF NOT EXISTS classifications (
-    post_id                     TEXT PRIMARY KEY REFERENCES raw_posts(post_id),
+CREATE TABLE IF NOT EXISTS fraud_classifications (
+    post_id             TEXT PRIMARY KEY REFERENCES raw_posts(post_id),
 
-    -- Primary classification
-    fraud_type                  TEXT,
-    fraud_type_secondary        TEXT,
-    fraud_vector                TEXT,
+    is_relevant         BOOLEAN,
+    fraud_type          TEXT,
+    industry            TEXT,
+    loss_bracket        TEXT,
+    channel             TEXT,
+    notable_quote       TEXT,
+    tags                JSONB,
 
-    -- Severity and impact
-    severity                    TEXT,
-    financial_loss_mentioned    BOOLEAN,
-    loss_amount_usd             NUMERIC(12,2),
-
-    -- Context
-    industry                    TEXT,
-    platform_mentioned          TEXT,
-    geographic_region           TEXT,
-
-    -- AI/Technology angle
-    involves_ai                 BOOLEAN,
-    ai_technique_mentioned      TEXT,
-
-    -- Identity verification angle
-    verification_mentioned      BOOLEAN,
-    verification_type           TEXT,
-    verification_sentiment      TEXT,
-    verification_context        TEXT,
-
-    -- Victim/poster perspective
-    post_type                   TEXT,
-    victim_sentiment            TEXT,
-    resolution_status           TEXT,
-
-    -- Generated summary
-    summary                     TEXT,
-
-    -- Metadata
-    classified_at               TIMESTAMP DEFAULT NOW(),
-    llm_model_used              TEXT
+    llm_model           TEXT,
+    classified_at       TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_classifications_fraud_type ON classifications(fraud_type);
-CREATE INDEX IF NOT EXISTS idx_classifications_industry ON classifications(industry);
-CREATE INDEX IF NOT EXISTS idx_classifications_severity ON classifications(severity);
-CREATE INDEX IF NOT EXISTS idx_classifications_involves_ai ON classifications(involves_ai);
-CREATE INDEX IF NOT EXISTS idx_classifications_verification ON classifications(verification_mentioned);
+CREATE INDEX IF NOT EXISTS idx_fraud_type ON fraud_classifications(fraud_type);
+CREATE INDEX IF NOT EXISTS idx_fraud_industry ON fraud_classifications(industry);
+
+-- ============================================================
+-- Pass 2: IDV deep classification
+-- ============================================================
+CREATE TABLE IF NOT EXISTS idv_classifications (
+    post_id             TEXT PRIMARY KEY REFERENCES raw_posts(post_id),
+
+    is_relevant         BOOLEAN,
+    verification_type   TEXT,
+    friction_type       TEXT,
+    trigger_reason      TEXT,
+    platform_name       TEXT,
+    sentiment           TEXT,
+    notable_quote       TEXT,
+    tags                JSONB,
+
+    llm_model           TEXT,
+    classified_at       TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_idv_verification_type ON idv_classifications(verification_type);
+CREATE INDEX IF NOT EXISTS idx_idv_friction_type ON idv_classifications(friction_type);
+CREATE INDEX IF NOT EXISTS idx_idv_sentiment ON idv_classifications(sentiment);
 
 -- ============================================================
 -- Collection run tracking

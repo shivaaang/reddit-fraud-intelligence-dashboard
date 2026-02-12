@@ -4,7 +4,7 @@ Cheaply eliminates obviously unusable posts (deleted content, negative score)
 to save LLM API calls.
 """
 
-from backend.db import get_conn, get_cursor, mark_pre_filtered
+from backend.db import get_posts_for_prefilter, mark_pre_filtered
 from backend.utils import setup_logger
 
 log = setup_logger("pre_filter")
@@ -15,16 +15,7 @@ SKIP_TITLES = {"[deleted]", "[removed]", ""}
 
 def run_pre_filter():
     """Mark posts that should skip LLM filtering."""
-    with get_conn() as conn:
-        with get_cursor(conn) as cur:
-            # Find posts that are clearly not worth sending to LLM
-            cur.execute("""
-                SELECT post_id, title, selftext, score
-                FROM raw_posts
-                WHERE is_relevant IS NULL
-                  AND pre_filtered_out = FALSE
-            """)
-            rows = cur.fetchall()
+    rows = get_posts_for_prefilter()
 
     to_skip = []
     reasons = {"deleted_content": 0, "negative_score": 0, "no_text_content": 0}

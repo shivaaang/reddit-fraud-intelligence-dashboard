@@ -44,7 +44,9 @@ def fetch_comments_for_post(post_id: str, max_comments: int = None) -> list[dict
     params = {"sort": "top", "limit": 200}
 
     data = _reddit_get(url, params=params)
-    if data is None or not isinstance(data, list) or len(data) < 2:
+    if data is None:
+        return None  # API failure — don't mark as fetched
+    if not isinstance(data, list) or len(data) < 2:
         return []
 
     # data[0] = post listing, data[1] = comment listing
@@ -84,8 +86,27 @@ def fetch_comments_for_post(post_id: str, max_comments: int = None) -> list[dict
     return comments
 
 
+def _mark_zero_comment_posts():
+    """Mark relevant posts with num_comments=0 as fetched (nothing to fetch)."""
+    with get_conn() as conn:
+        with get_cursor(conn) as cur:
+            cur.execute("""
+                UPDATE raw_posts
+                SET comments_fetched = TRUE
+                WHERE (is_fraud = TRUE OR is_idv = TRUE)
+                  AND comments_fetched = FALSE
+                  AND num_comments = 0
+            """)
+            count = cur.rowcount
+    if count:
+        log.info(f"Marked {count} zero-comment posts as fetched")
+    return count
+
+
 def run_comment_collection():
     """Fetch comments for all relevant posts that don't have comments yet."""
+    _mark_zero_comment_posts()
+
     run_id = start_run("initial_collection", "comment_fetch")
 
     total_posts = 0
@@ -100,6 +121,11 @@ def run_comment_collection():
         for post_id in post_ids:
             try:
                 comments = fetch_comments_for_post(post_id)
+                if comments is None:
+                    # API failure (429, network error) — skip, don't mark
+                    failed += 1
+                    time.sleep(5)  # back off on failure
+                    continue
                 if comments:
                     inserted = insert_comments_batch(comments)
                     total_comments += inserted
@@ -115,7 +141,6 @@ def run_comment_collection():
             except Exception as e:
                 log.error(f"Error fetching comments for {post_id}: {e}")
                 failed += 1
-                mark_comments_fetched(post_id)
 
             time.sleep(REDDIT_REQUEST_DELAY)
 

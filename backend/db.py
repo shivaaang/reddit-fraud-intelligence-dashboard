@@ -10,7 +10,7 @@ _pool = None
 def get_pool():
     global _pool
     if _pool is None:
-        _pool = pool.ThreadedConnectionPool(1, 25, DATABASE_URL)
+        _pool = pool.ThreadedConnectionPool(1, 40, DATABASE_URL)
     return _pool
 
 
@@ -137,93 +137,70 @@ def mark_comments_fetched(post_id: str):
             )
 
 
-def update_post_relevance(post_id: str, is_relevant: bool, confidence: float,
-                          topic_hint: str, language: str = None,
-                          category: str = None):
-    with get_conn() as conn:
-        with get_cursor(conn) as cur:
-            cur.execute("""
-                UPDATE raw_posts
-                SET is_relevant = %s,
-                    relevance_confidence = %s,
-                    relevance_topic_hint = %s,
-                    relevance_language = %s,
-                    relevance_category = %s,
-                    relevance_filtered_at = NOW()
-                WHERE post_id = %s
-            """, (is_relevant, confidence, topic_hint, language, category, post_id))
-
-
 def mark_pre_filtered(post_ids: list[str]):
     with get_conn() as conn:
         with get_cursor(conn) as cur:
             cur.execute("""
                 UPDATE raw_posts
-                SET pre_filtered_out = TRUE,
-                    is_relevant = FALSE,
-                    relevance_confidence = 1.0,
-                    relevance_topic_hint = 'pre_filtered',
-                    relevance_filtered_at = NOW()
+                SET pre_filtered_out = TRUE
                 WHERE post_id = ANY(%s)
             """, (post_ids,))
 
 
-def insert_classification(post_id: str, classification: dict, model_used: str):
-    classification["post_id"] = post_id
-    classification["llm_model_used"] = model_used
+# ---- Pass 1: Refilter functions ----
 
-    cols = [
-        "post_id", "fraud_type", "fraud_type_secondary", "fraud_vector",
-        "severity", "financial_loss_mentioned", "loss_amount_usd",
-        "industry", "platform_mentioned", "geographic_region",
-        "involves_ai", "ai_technique_mentioned",
-        "verification_mentioned", "verification_type",
-        "verification_sentiment", "verification_context",
-        "post_type", "victim_sentiment", "resolution_status",
-        "summary", "llm_model_used",
-    ]
-    col_names = ", ".join(cols)
-    placeholders = ", ".join(["%s"] * len(cols))
-    values = [classification.get(c) for c in cols]
-
-    sql = f"""
-        INSERT INTO classifications ({col_names})
-        VALUES ({placeholders})
-        ON CONFLICT (post_id) DO NOTHING
-    """
+def update_post_refilter(post_id: str, is_fraud: bool, is_idv: bool, confidence: float):
     with get_conn() as conn:
         with get_cursor(conn) as cur:
-            cur.execute(sql, values)
-            if cur.rowcount > 0:
-                cur.execute(
-                    "UPDATE raw_posts SET classification_done = TRUE WHERE post_id = %s",
-                    (post_id,),
-                )
+            cur.execute("""
+                UPDATE raw_posts
+                SET is_fraud = %s,
+                    is_idv = %s,
+                    refilter_confidence = %s,
+                    refilter_done = TRUE
+                WHERE post_id = %s
+            """, (is_fraud, is_idv, confidence, post_id))
 
 
-def get_unfiltered_posts(batch_size: int = 50, offset: int = 0):
+def get_unrefiltered_posts(batch_size: int = 50):
     with get_conn() as conn:
         with get_cursor(conn) as cur:
             cur.execute("""
                 SELECT post_id, title, selftext, subreddit, score, num_comments
                 FROM raw_posts
-                WHERE is_relevant IS NULL
-                  AND pre_filtered_out = FALSE
+                WHERE refilter_done = FALSE
+                  AND pre_filtered_out IS NOT TRUE
                 ORDER BY post_id
-                LIMIT %s OFFSET %s
-            """, (batch_size, offset))
+                LIMIT %s
+            """, (batch_size,))
             return cur.fetchall()
 
 
-def get_unfiltered_count():
+def get_unrefiltered_count():
     with get_conn() as conn:
         with get_cursor(conn) as cur:
             cur.execute("""
                 SELECT COUNT(*) as cnt FROM raw_posts
-                WHERE is_relevant IS NULL AND pre_filtered_out = FALSE
+                WHERE refilter_done = FALSE AND pre_filtered_out IS NOT TRUE
             """)
             return cur.fetchone()["cnt"]
 
+
+def get_random_unrefiltered_posts(sample_size: int):
+    with get_conn() as conn:
+        with get_cursor(conn) as cur:
+            cur.execute("""
+                SELECT post_id, title, selftext, subreddit, score, num_comments
+                FROM raw_posts
+                WHERE refilter_done = FALSE
+                  AND pre_filtered_out IS NOT TRUE
+                ORDER BY RANDOM()
+                LIMIT %s
+            """, (sample_size,))
+            return cur.fetchall()
+
+
+# ---- Comment functions ----
 
 def get_relevant_posts_without_comments(batch_size: int = 100):
     with get_conn() as conn:
@@ -231,39 +208,137 @@ def get_relevant_posts_without_comments(batch_size: int = 100):
             cur.execute("""
                 SELECT post_id
                 FROM raw_posts
-                WHERE is_relevant = TRUE
+                WHERE (is_fraud = TRUE OR is_idv = TRUE)
                   AND comments_fetched = FALSE
+                  AND num_comments > 0
                 ORDER BY score DESC
                 LIMIT %s
             """, (batch_size,))
             return [r["post_id"] for r in cur.fetchall()]
 
 
-def get_unclassified_posts(batch_size: int = 50):
+def get_top_comments_for_post(post_id: str, limit: int = 5):
+    with get_conn() as conn:
+        with get_cursor(conn) as cur:
+            cur.execute("""
+                SELECT body, score, author, is_submitter
+                FROM comments
+                WHERE post_id = %s
+                ORDER BY is_submitter DESC, score DESC
+                LIMIT %s
+            """, (post_id, limit))
+            return cur.fetchall()
+
+
+# ---- Pre-filter functions ----
+
+def get_posts_for_prefilter():
+    """Get posts that haven't been pre-filtered or refiltered yet."""
+    with get_conn() as conn:
+        with get_cursor(conn) as cur:
+            cur.execute("""
+                SELECT post_id, title, selftext, score
+                FROM raw_posts
+                WHERE refilter_done = FALSE
+                  AND pre_filtered_out = FALSE
+            """)
+            return cur.fetchall()
+
+
+# ---- Classification functions ----
+
+def insert_fraud_classification(post_id: str, classification: dict, model: str = None):
+    with get_conn() as conn:
+        with get_cursor(conn) as cur:
+            cur.execute("""
+                INSERT INTO fraud_classifications
+                    (post_id, is_relevant, fraud_type, industry, loss_bracket, channel,
+                     notable_quote, tags, llm_model)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (post_id) DO UPDATE SET
+                    is_relevant = EXCLUDED.is_relevant,
+                    fraud_type = EXCLUDED.fraud_type,
+                    industry = EXCLUDED.industry,
+                    loss_bracket = EXCLUDED.loss_bracket,
+                    channel = EXCLUDED.channel,
+                    notable_quote = EXCLUDED.notable_quote,
+                    tags = EXCLUDED.tags,
+                    llm_model = EXCLUDED.llm_model,
+                    classified_at = NOW()
+            """, (
+                post_id,
+                classification.get("is_relevant", True),
+                classification["fraud_type"],
+                classification["industry"],
+                classification["loss_bracket"],
+                classification["channel"],
+                classification.get("notable_quote"),
+                json.dumps(classification.get("tags", [])),
+                model,
+            ))
+
+
+def insert_idv_classification(post_id: str, classification: dict, model: str = None):
+    with get_conn() as conn:
+        with get_cursor(conn) as cur:
+            cur.execute("""
+                INSERT INTO idv_classifications
+                    (post_id, is_relevant, verification_type, friction_type,
+                     trigger_reason, platform_name, sentiment,
+                     notable_quote, tags, llm_model)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (post_id) DO UPDATE SET
+                    is_relevant = EXCLUDED.is_relevant,
+                    verification_type = EXCLUDED.verification_type,
+                    friction_type = EXCLUDED.friction_type,
+                    trigger_reason = EXCLUDED.trigger_reason,
+                    platform_name = EXCLUDED.platform_name,
+                    sentiment = EXCLUDED.sentiment,
+                    notable_quote = EXCLUDED.notable_quote,
+                    tags = EXCLUDED.tags,
+                    llm_model = EXCLUDED.llm_model,
+                    classified_at = NOW()
+            """, (
+                post_id,
+                classification.get("is_relevant", True),
+                classification["verification_type"],
+                classification["friction_type"],
+                classification.get("trigger_reason", "unknown"),
+                classification.get("platform_name"),
+                classification["sentiment"],
+                classification.get("notable_quote"),
+                json.dumps(classification.get("tags", [])),
+                model,
+            ))
+
+
+def get_unclassified_fraud_posts(batch_size: int = 50):
     with get_conn() as conn:
         with get_cursor(conn) as cur:
             cur.execute("""
                 SELECT p.post_id, p.title, p.selftext, p.subreddit,
                        p.score, p.num_comments, p.created_utc
                 FROM raw_posts p
-                WHERE p.is_relevant = TRUE
-                  AND p.classification_done = FALSE
+                WHERE p.is_fraud = TRUE
+                  AND p.post_id NOT IN (SELECT post_id FROM fraud_classifications)
                 ORDER BY p.score DESC
                 LIMIT %s
             """, (batch_size,))
             return cur.fetchall()
 
 
-def get_top_comments_for_post(post_id: str, limit: int = 8):
+def get_unclassified_idv_posts(batch_size: int = 50):
     with get_conn() as conn:
         with get_cursor(conn) as cur:
             cur.execute("""
-                SELECT body, score, author
-                FROM comments
-                WHERE post_id = %s
-                ORDER BY score DESC
+                SELECT p.post_id, p.title, p.selftext, p.subreddit,
+                       p.score, p.num_comments, p.created_utc
+                FROM raw_posts p
+                WHERE p.is_idv = TRUE
+                  AND p.post_id NOT IN (SELECT post_id FROM idv_classifications)
+                ORDER BY p.score DESC
                 LIMIT %s
-            """, (post_id, limit))
+            """, (batch_size,))
             return cur.fetchall()
 
 
@@ -300,12 +375,82 @@ def get_collection_stats():
             cur.execute("""
                 SELECT
                     COUNT(*) as total_posts,
-                    COUNT(*) FILTER (WHERE is_relevant = TRUE) as relevant_posts,
-                    COUNT(*) FILTER (WHERE is_relevant = FALSE) as irrelevant_posts,
-                    COUNT(*) FILTER (WHERE is_relevant IS NULL AND pre_filtered_out = FALSE) as unfiltered_posts,
                     COUNT(*) FILTER (WHERE pre_filtered_out = TRUE) as pre_filtered_posts,
-                    COUNT(*) FILTER (WHERE comments_fetched = TRUE) as comments_fetched_posts,
-                    COUNT(*) FILTER (WHERE classification_done = TRUE) as classified_posts
+                    COUNT(*) FILTER (WHERE refilter_done = TRUE) as refiltered_posts,
+                    COUNT(*) FILTER (WHERE refilter_done = FALSE AND pre_filtered_out IS NOT TRUE) as unrefiltered_posts,
+                    COUNT(*) FILTER (WHERE is_fraud = TRUE) as fraud_posts,
+                    COUNT(*) FILTER (WHERE is_idv = TRUE) as idv_posts,
+                    COUNT(*) FILTER (WHERE is_fraud = TRUE AND is_idv = TRUE) as both_posts,
+                    COUNT(*) FILTER (WHERE is_fraud = FALSE AND is_idv = FALSE AND refilter_done = TRUE) as neither_posts,
+                    COUNT(*) FILTER (WHERE comments_fetched = TRUE) as comments_fetched_posts
                 FROM raw_posts
             """)
-            return cur.fetchone()
+            stats = cur.fetchone()
+
+            # Classification counts
+            cur.execute("SELECT COUNT(*) as cnt FROM fraud_classifications")
+            stats["fraud_classified"] = cur.fetchone()["cnt"]
+            cur.execute("SELECT COUNT(*) as cnt FROM idv_classifications")
+            stats["idv_classified"] = cur.fetchone()["cnt"]
+
+            return stats
+
+
+# ---- Pass 2: Ready post fetching ----
+
+def get_ready_unclassified_posts(track: str, batch_size: int = 500, random_order: bool = False):
+    """Get unclassified posts that have comments fetched and are ready for Pass 2.
+
+    Args:
+        track: "fraud" or "idv"
+        batch_size: max posts to return
+        random_order: if True, return random sample (for testing)
+    """
+    if track == "fraud":
+        flag, table = "is_fraud", "fraud_classifications"
+    else:
+        flag, table = "is_idv", "idv_classifications"
+
+    order = "ORDER BY RANDOM()" if random_order else "ORDER BY p.score DESC"
+
+    with get_conn() as conn:
+        with get_cursor(conn) as cur:
+            cur.execute(f"""
+                SELECT p.post_id, p.title, p.selftext, p.subreddit,
+                       p.score, p.num_comments
+                FROM raw_posts p
+                WHERE p.{flag} = TRUE
+                  AND p.comments_fetched = TRUE
+                  AND p.post_id NOT IN (SELECT post_id FROM {table})
+                {order}
+                LIMIT %s
+            """, (batch_size,))
+            return cur.fetchall()
+
+
+def get_classification_progress():
+    """Get Pass 2 classification progress counts."""
+    with get_conn() as conn:
+        with get_cursor(conn) as cur:
+            cur.execute("SELECT COUNT(*) as cnt FROM fraud_classifications")
+            fraud_done = cur.fetchone()["cnt"]
+            cur.execute("SELECT COUNT(*) as cnt FROM idv_classifications")
+            idv_done = cur.fetchone()["cnt"]
+            cur.execute("""
+                SELECT COUNT(*) as cnt FROM raw_posts
+                WHERE is_fraud = TRUE AND comments_fetched = TRUE
+                  AND post_id NOT IN (SELECT post_id FROM fraud_classifications)
+            """)
+            fraud_ready = cur.fetchone()["cnt"]
+            cur.execute("""
+                SELECT COUNT(*) as cnt FROM raw_posts
+                WHERE is_idv = TRUE AND comments_fetched = TRUE
+                  AND post_id NOT IN (SELECT post_id FROM idv_classifications)
+            """)
+            idv_ready = cur.fetchone()["cnt"]
+            return {
+                "fraud_done": fraud_done,
+                "idv_done": idv_done,
+                "fraud_ready": fraud_ready,
+                "idv_ready": idv_ready,
+            }

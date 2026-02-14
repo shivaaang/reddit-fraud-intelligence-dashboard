@@ -1,6 +1,6 @@
 # Fraud Landscape Intelligence Dashboard
 
-An analysis of 40,000+ Reddit posts about fraud, scams, and identity verification — structured into a queryable dataset for product intelligence.
+An analysis of 49,000+ Reddit posts about fraud, scams, and identity verification — structured into a queryable dataset for product intelligence.
 
 Built as a showcase project for Persona (identity verification infrastructure).
 
@@ -19,9 +19,9 @@ A data pipeline that collects Reddit posts discussing fraud and identity verific
 ┌──────────────────┐     ┌────────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │  Reddit .json    │────▶│  Pass 1:       │────▶│  Comment         │────▶│  Pass 2:         │
 │  Collection      │     │  Boolean       │     │  Collection      │     │  Deep            │
-│  (12 tiers)      │     │  Routing       │     │  (top 5/post)    │     │  Classification  │
-│                  │     │  (GPT-OSS-120B)│     │                  │     │  (DeepSeek V3.2) │
-│  40,391 posts    │     │  is_fraud?     │     │  ~100K comments  │     │  7-10 fields     │
+│  (21 tiers)      │     │  Routing       │     │  (top 5/post)    │     │  Classification  │
+│                  │     │                │     │                  │     │  (DeepSeek V3.2) │
+│  49,499 posts    │     │  is_fraud?     │     │  81K comments    │     │  7-10 fields     │
 │                  │     │  is_idv?       │     │                  │     │  per post        │
 └──────────────────┘     └────────────────┘     └──────────────────┘     └──────────────────┘
                                                                                   │
@@ -40,19 +40,20 @@ A data pipeline that collects Reddit posts discussing fraud and identity verific
 
 | Metric | Count |
 |--------|-------|
-| Total posts collected | 40,316 |
-| Pre-filtered (deleted/empty) | 277 |
+| Total posts collected | 49,499 |
+| Unique subreddits | 7,393 |
+| Total comments | 81,662 |
 | Pass 1: Fraud-flagged | 12,556 |
-| Pass 1: IDV-flagged | 10,360 |
+| Pass 1: IDV-flagged | 14,595 |
 | Pass 1: Both | 2,154 |
 | Pass 2: Fraud relevant | 8,739 |
-| Pass 2: IDV relevant | 7,720 |
+| Pass 2: IDV relevant | 11,737 |
 
 ## Tech Stack
 
 - **Language:** Python 3.11+
 - **Database:** Neon PostgreSQL (serverless)
-- **Pass 1 LLM:** OpenRouter → `openai/gpt-oss-120b` (boolean routing with structured output)
+- **Pass 1 LLM:** OpenRouter → `openai/gpt-oss-120b` (boolean routing) + `deepseek/deepseek-v3.2` (IDV-only classifier for enhanced tiers)
 - **Pass 2 LLM:** OpenRouter → `deepseek/deepseek-v3.2` (deep classification with Pydantic validation)
 - **HTTP Client:** httpx
 - **Data Source:** Reddit public `.json` endpoints (no API key required)
@@ -93,7 +94,7 @@ Every phase runs through a single entry point:
 # 1. Initialize database tables
 python -m backend.pipeline init
 
-# 2. Collect posts from Reddit (12-tier search strategy)
+# 2. Collect posts from Reddit (21-tier search strategy)
 python -m backend.pipeline collect
 
 # 3. Pre-filter deleted/empty posts (saves LLM calls)
@@ -126,9 +127,10 @@ python -m backend.pipeline stats
 ├── backend/
 │   ├── __init__.py
 │   ├── pipeline.py           # CLI entry point — runs all phases
-│   ├── reddit_collector.py   # Phase 1: Reddit post collection (12 tiers)
+│   ├── reddit_collector.py   # Phase 1: Reddit post collection (21 tiers)
 │   ├── pre_filter.py         # Phase 2: Cheap pre-filter (deleted/empty posts)
-│   ├── pass1_classifier.py   # Phase 3: Boolean classification (is_fraud / is_idv)
+│   ├── pass1_classifier.py   # Phase 3a: Boolean classification (is_fraud / is_idv) — GPT-OSS-120B
+│   ├── pass1_idv_classifier.py # Phase 3b: IDV-only classifier for enhanced tiers — DeepSeek V3.2
 │   ├── comment_collector.py  # Phase 4: Fetch top comments for relevant posts
 │   ├── pass2_classifier.py   # Phase 5: Deep classification (DeepSeek V3.2)
 │   ├── llm_client.py         # OpenRouter API clients (Pass 1: GPT-OSS-120B, Pass 2: DeepSeek V3.2)

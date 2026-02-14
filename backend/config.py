@@ -17,7 +17,7 @@ PASS2_MODEL = os.getenv("PASS2_MODEL", "deepseek/deepseek-v3.2")
 # Reddit JSON endpoint (no API key needed)
 REDDIT_BASE_URL = "https://www.reddit.com"
 REDDIT_USER_AGENT = "fraud-dashboard-research:v1.0 (educational project)"
-REDDIT_REQUEST_DELAY = 2.0  # seconds between requests (1.0s hits 429 after ~100 sustained reqs)
+REDDIT_REQUEST_DELAY = 4.0  # seconds between requests
 
 # Processing
 MAX_COMMENTS_PER_POST = int(os.getenv("MAX_COMMENTS_PER_POST", "5"))

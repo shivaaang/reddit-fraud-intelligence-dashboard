@@ -8,11 +8,15 @@ This documents the key decisions, experiments, and lessons from building the fra
 
 **Why Reddit?** Fraud victims post detailed first-person accounts — what happened, how much they lost, which platform was involved, and whether identity verification could have stopped it. No other public source has this density of structured fraud narratives.
 
-**Collection strategy:** 12 search tiers, from high-density fraud subreddits (r/Scams, r/identitytheft) to targeted keyword searches across gig economy, fintech, government, dating, and gambling verticals. Each tier widens the net while the later tiers target specific angles (Persona competitors, privacy concerns, accessibility issues).
+**Collection strategy:** 21 search tiers in two phases:
+- **Tiers 1–12 (original):** High-density fraud subreddits (r/Scams, r/identitytheft) → keyword searches across fintech, government, dating, gambling verticals → global cross-Reddit queries → Persona competitors and privacy concerns. ~40,300 posts.
+- **Tiers 13–21 (enhanced, IDV-focused):** Targeted subreddit-specific searches for identity verification content — social media IDV (Facebook, Instagram), gaming age verification (Roblox, CharacterAI), expanded gig economy, crypto KYC, freelancing platforms, financial IDV, and AI/tech platform verification. ~9,200 additional posts.
 
-**Rate limits:** Reddit's documented limit for unauthenticated requests is 10 RPM. Through testing, the actual sustained limit is ~160 RPM before 429 responses start. We settled on a 2-second delay between requests — fast enough for practical collection, conservative enough to avoid blocks.
+The enhanced tiers were added after initial analysis showed the IDV dataset was underrepresenting certain verticals (gaming, social media, crypto KYC). These tiers use subreddit-restricted keyword searches to collect posts that mention verification terms within specific communities.
 
-**Result:** 40,316 posts collected. 277 pre-filtered out (deleted content, negative scores, empty posts with short titles).
+**Rate limits:** Reddit's documented limit for unauthenticated requests is 10 RPM. Through testing, the actual sustained limit is ~160 RPM before 429 responses start. We settled on a 4-second delay between requests for sustained collection, with VPN IP rotation for burst collection sessions.
+
+**Result:** 49,499 posts collected across 7,393 unique subreddits.
 
 ## 2. Pass 1: Boolean Routing
 
@@ -27,7 +31,17 @@ This documents the key decisions, experiments, and lessons from building the fra
 
 **Key takeaway:** The LLM has a precision ceiling around 80–85% for boolean routing at this prompt complexity. Recall is excellent (97%+). The ~15–20% false positive rate is systematic — the model over-triggers on keyword presence rather than substantive discussion. This is acceptable because Pass 2 classification naturally filters out irrelevant posts during deep analysis (the `is_relevant` field).
 
-**Result:** 12,556 fraud-flagged, 10,360 IDV-flagged, 2,154 both, 19,277 neither.
+**Result (original tiers 1–12):** 12,556 fraud-flagged, 10,360 IDV-flagged, 2,154 both, 19,277 neither.
+
+### Pass 1b: IDV-Only Classifier (Enhanced Tiers)
+
+Posts from the enhanced collection tiers (13–21) were all gathered via IDV-targeted keyword searches, so they only needed IDV classification — not the dual fraud/IDV routing of the original Pass 1.
+
+**Model:** DeepSeek V3.2 via OpenRouter (`reasoning: none`, 30 concurrent workers). Chosen over GPT-OSS-120B because these posts only needed a single boolean (`is_idv`) rather than two flags, making the simpler/faster model sufficient.
+
+**Prompt design:** The IDV-only prompt is more aggressive with exclusions than the original Pass 1 prompt. Since every post in the enhanced tiers already contains verification-related keywords (they were collected via keyword search), the classifier's job is to distinguish *substantive IDV discussion* from noise. The exclusion list covers: 2FA/MFA, account recovery, background checks, government document issuance, business/page/creator verification, email/phone verification, colloquial "verify", account deactivation for non-identity reasons, India-specific government identity infrastructure, passing mentions, referral spam, and anti-cheat systems.
+
+**Result:** 8,779 posts processed. 4,235 classified as IDV-relevant (48.3%), 4,544 not relevant. Combined with the original tiers: 14,595 total IDV-flagged posts.
 
 ## 3. Comment Collection
 
@@ -37,7 +51,7 @@ This documents the key decisions, experiments, and lessons from building the fra
 
 **Bug fix:** Early runs had a silent data loss bug — when a 429 (rate limit) response was returned, the post was still marked as `comments_fetched = TRUE`. This meant those posts would never be retried. Fixed by returning `None` on API failure and only marking fetched on success.
 
-**Result:** ~100K comments collected across all relevant posts (top 5 per post, sorted by OP-first then score).
+**Result:** 81,662 comments collected across 22,015 relevant posts (top 5 per post, sorted by score).
 
 ## 4. Pass 2: Model Selection
 
@@ -82,10 +96,14 @@ The `is_relevant` field in both classification tables tracks this, allowing the 
 
 | Metric | Count |
 |--------|-------|
-| Total posts collected | 40,316 |
-| Pre-filtered (deleted/empty) | 277 |
+| Total posts collected | 49,499 |
+| Unique subreddits | 7,393 |
+| Total comments | 81,662 |
 | Pass 1: Fraud-flagged | 12,556 |
-| Pass 1: IDV-flagged | 10,360 |
+| Pass 1: IDV-flagged | 14,595 |
 | Pass 1: Both | 2,154 |
+| Pass 2: Fraud classified | 12,556 |
 | Pass 2: Fraud relevant | 8,739 |
-| Pass 2: IDV relevant | 7,720 |
+| Pass 2: IDV classified | 14,595 |
+| Pass 2: IDV relevant | 11,737 |
+| **Total confirmed relevant** | **20,476** |

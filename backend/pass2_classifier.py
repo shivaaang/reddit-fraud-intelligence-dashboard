@@ -235,6 +235,12 @@ def _preprocess(data: dict) -> dict:
         if field in data and isinstance(data[field], str):
             data[field] = data[field].strip().lower().replace(" ", "_").replace("-", "_")
 
+    # Fix common LLM enum mismatches
+    if data.get("friction_type") == "unknown":
+        data["friction_type"] = "other"
+    if data.get("trigger_reason") == "info_mismatch":
+        data["trigger_reason"] = "unknown"
+
     # Ensure tags is a list
     if "tags" in data:
         if isinstance(data["tags"], str):

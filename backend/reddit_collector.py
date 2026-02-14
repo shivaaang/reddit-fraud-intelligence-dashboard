@@ -26,15 +26,23 @@ def _get_client() -> httpx.Client:
 
 
 def _reddit_get(url: str, params: dict = None) -> dict | None:
-    """Make a rate-limited GET request to Reddit's .json endpoint."""
+    """Make a GET request to Reddit's .json endpoint.
+
+    Returns:
+        dict: successful response
+        None: error (logged)
+    """
     client = _get_client()
     try:
         resp = client.get(url, params=params)
         if resp.status_code == 429:
-            retry_after = int(resp.headers.get("Retry-After", "60"))
+            retry_after = int(resp.headers.get("Retry-After", 60))
             log.warning(f"Rate limited (429). Waiting {retry_after}s...")
             time.sleep(retry_after)
             resp = client.get(url, params=params)
+            if resp.status_code != 200:
+                log.error(f"HTTP {resp.status_code} for {url}: {resp.text[:200]}")
+                return None
 
         if resp.status_code != 200:
             log.error(f"HTTP {resp.status_code} for {url}: {resp.text[:200]}")
@@ -778,8 +786,185 @@ def collect_tier12():
                                 "tier12_techniques", "search_techniques")
 
 
+# ── Enhanced Collection Tiers (IDV-focused, subreddit-specific searches) ────
+
+# Tier 13: Social media platform IDV
+TIER13_SOCIAL_MEDIA_IDV = {
+    "facebook": [
+        "verify identity", "selfie verification", "upload ID", "photo ID",
+        "video verification", "identity verification", "account disabled verify",
+    ],
+    "Instagram": [
+        "verify identity", "identity verification", "selfie",
+        "upload ID", "disabled verify",
+    ],
+    "FixMyInstagram": [
+        "verify", "verification", "identity", "selfie", "upload ID",
+    ],
+    "facebookdisabledme": [
+        "verify", "verification", "identity", "selfie", "upload ID", "photo",
+    ],
+    "youtube": [
+        "age verification", "verify identity", "identity verification", "upload ID",
+    ],
+}
+
+# Tier 14: Gaming age verification
+TIER14_GAMING_IDV = {
+    "RobloxHelp": [
+        "age verification", "verify age", "ID check",
+        "identity verification", "upload ID",
+    ],
+    "Roblox": [
+        "age verification", "verify age", "ID check", "identity verification",
+    ],
+    "CharacterAI": [
+        "age verification", "verify age", "identity verification", "ID check",
+    ],
+    "FACEITcom": [
+        "verification", "verify identity", "identity", "KYC",
+    ],
+    "FortNiteBR": [
+        "age verification", "verify age", "ID check",
+    ],
+}
+
+# Tier 15: Expanded gig economy
+TIER15_GIG_EXPANDED = {
+    "Sparkdriver": [
+        "verification", "verify identity", "deactivated",
+        "identity", "selfie", "Checkr",
+    ],
+    "UberEatsDrivers": [
+        "verification", "verify identity", "deactivated", "identity", "selfie",
+    ],
+    "AmazonFlexDrivers": [
+        "verification", "verify identity", "deactivated", "identity",
+    ],
+    "grubhubdrivers": [
+        "verification", "verify identity", "deactivated", "identity",
+    ],
+    "ShiptShoppers": [
+        "verification", "verify identity", "deactivated", "identity",
+    ],
+}
+
+# Tier 16: r/Scams deep search (fraud keywords never searched within)
+TIER16_SCAMS_DEEP = {
+    "Scams": [
+        "identity theft", "deepfake", "synthetic identity", "account takeover",
+        "SIM swap", "phishing", "social engineering", "romance scam",
+        "investment scam", "pig butchering", "fake ID",
+        "impersonation", "money mule",
+    ],
+}
+
+# Tier 17: Crypto platform IDV
+TIER17_CRYPTO_IDV = {
+    "PiNetwork": [
+        "KYC", "verification", "verify identity", "identity", "passport", "selfie",
+    ],
+    "CryptoMarkets": [
+        "KYC", "verify identity", "identity verification",
+    ],
+    "BitcoinBeginners": [
+        "KYC", "verify identity", "identity verification", "exchange verification",
+    ],
+    "binance": [
+        "KYC", "verify identity", "identity verification", "verification failed",
+    ],
+}
+
+# Tier 18: Freelancing platform IDV
+TIER18_FREELANCE_IDV = {
+    "Upwork": [
+        "verify identity", "identity verification", "KYC", "upload ID", "selfie",
+    ],
+    "Fiverr": [
+        "verify identity", "identity verification", "KYC", "upload ID",
+    ],
+    "freelance": [
+        "verify identity", "identity verification", "KYC", "platform verification",
+    ],
+}
+
+# Tier 19: IDV queries in financial subreddits (Tier 2 only had fraud keywords)
+TIER19_FINANCIAL_IDV = {
+    "personalfinance": [
+        "verify identity", "identity verification", "KYC", "selfie verification",
+    ],
+    "Banking": [
+        "verify identity", "identity verification", "KYC", "bank verification",
+    ],
+    "CreditCards": [
+        "verify identity", "identity verification", "KYC",
+    ],
+}
+
+# Tier 21: AI/tech platform IDV
+TIER21_TECH_IDV = {
+    "ChatGPT": [
+        "age verification", "verify identity", "identity verification", "verify age",
+    ],
+    "OpenAI": [
+        "age verification", "verify identity", "identity verification",
+    ],
+    "technology": [
+        "identity verification", "KYC", "age verification", "facial recognition",
+    ],
+}
+
+
+def collect_tier13():
+    """Tier 13: Social media platform IDV searches."""
+    return _collect_mixed_tier(TIER13_SOCIAL_MEDIA_IDV, [],
+                               "tier13_social_media_idv", "search_social_idv")
+
+
+def collect_tier14():
+    """Tier 14: Gaming age verification searches."""
+    return _collect_mixed_tier(TIER14_GAMING_IDV, [],
+                               "tier14_gaming_idv", "search_gaming_idv")
+
+
+def collect_tier15():
+    """Tier 15: Expanded gig economy searches."""
+    return _collect_mixed_tier(TIER15_GIG_EXPANDED, [],
+                               "tier15_gig_expanded", "search_gig_expanded")
+
+
+def collect_tier16():
+    """Tier 16: r/Scams deep keyword search."""
+    return _collect_mixed_tier(TIER16_SCAMS_DEEP, [],
+                               "tier16_scams_deep", "search_scams_deep")
+
+
+def collect_tier17():
+    """Tier 17: Crypto platform IDV searches."""
+    return _collect_mixed_tier(TIER17_CRYPTO_IDV, [],
+                               "tier17_crypto_idv", "search_crypto_idv")
+
+
+def collect_tier18():
+    """Tier 18: Freelancing platform IDV searches."""
+    return _collect_mixed_tier(TIER18_FREELANCE_IDV, [],
+                               "tier18_freelance_idv", "search_freelance_idv")
+
+
+def collect_tier19():
+    """Tier 19: IDV queries in financial subreddits."""
+    return _collect_mixed_tier(TIER19_FINANCIAL_IDV, [],
+                               "tier19_financial_idv", "search_financial_idv")
+
+
+def collect_tier21():
+    """Tier 21: AI/tech platform IDV searches."""
+    return _collect_mixed_tier(TIER21_TECH_IDV, [],
+                               "tier21_tech_idv", "search_tech_idv")
+
+
 def collect_all():
-    """Run all collection tiers."""
+    """Run original collection tiers (1-12)."""
     log.info("Starting Reddit collection (using .json endpoints)...")
 
     for name, fn in [("Tier 1", collect_tier1), ("Tier 2", collect_tier2),
@@ -794,5 +979,46 @@ def collect_all():
     log.info("All collection complete.")
 
 
+ENHANCED_TIERS = [
+    ("Tier 13 — Social Media IDV", collect_tier13),
+    ("Tier 14 — Gaming IDV", collect_tier14),
+    ("Tier 15 — Gig Expanded", collect_tier15),
+    ("Tier 16 — Scams Deep", collect_tier16),
+    ("Tier 17 — Crypto IDV", collect_tier17),
+    ("Tier 18 — Freelance IDV", collect_tier18),
+    ("Tier 19 — Financial IDV", collect_tier19),
+    ("Tier 21 — Tech IDV", collect_tier21),
+]
+
+
+def collect_enhanced():
+    """Run enhanced collection tiers (13-21)."""
+    log.info("Starting enhanced collection (IDV-focused subreddit searches)...")
+
+    for name, fn in ENHANCED_TIERS:
+        result = fn()
+        log.info(f"{name} done: {result} new posts")
+
+    log.info("Enhanced collection complete.")
+
+
 if __name__ == "__main__":
-    collect_all()
+    import sys
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "enhanced"
+
+    if cmd == "all":
+        collect_all()
+    elif cmd == "enhanced":
+        collect_enhanced()
+    elif cmd.startswith("tier"):
+        tier_num = cmd.replace("tier", "")
+        fn_name = f"collect_tier{tier_num}"
+        fn = globals().get(fn_name)
+        if fn:
+            fn()
+        else:
+            print(f"Unknown tier: {cmd}")
+            sys.exit(1)
+    else:
+        print(f"Usage: python -m backend.reddit_collector [all|enhanced|tier13|tier14|...]")
+        sys.exit(1)

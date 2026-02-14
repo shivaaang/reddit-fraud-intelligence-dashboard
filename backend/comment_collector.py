@@ -30,8 +30,13 @@ def _get_post_permalink(post_id: str) -> str | None:
             return None
 
 
-def fetch_comments_for_post(post_id: str, max_comments: int = None) -> list[dict]:
-    """Fetch top comments for a single post using .json endpoint."""
+def fetch_comments_for_post(post_id: str, max_comments: int = None) -> list[dict] | None:
+    """Fetch top comments for a single post using .json endpoint.
+
+    Returns:
+        list[dict]: comments fetched successfully
+        None: API failure
+    """
     max_comments = max_comments or MAX_COMMENTS_PER_POST
 
     permalink = _get_post_permalink(post_id)
@@ -39,17 +44,15 @@ def fetch_comments_for_post(post_id: str, max_comments: int = None) -> list[dict
         log.warning(f"No permalink found for post {post_id}")
         return []
 
-    # Reddit comment endpoint: /r/{sub}/comments/{id}.json
     url = f"{REDDIT_BASE_URL}{permalink}.json"
     params = {"sort": "top", "limit": 200}
 
     data = _reddit_get(url, params=params)
     if data is None:
-        return None  # API failure — don't mark as fetched
+        return None
     if not isinstance(data, list) or len(data) < 2:
         return []
 
-    # data[0] = post listing, data[1] = comment listing
     comment_listing = data[1]
     if "data" not in comment_listing:
         return []
@@ -104,7 +107,7 @@ def _mark_zero_comment_posts():
 
 
 def run_comment_collection():
-    """Fetch comments for all relevant posts that don't have comments yet."""
+    """Fetch comments for all relevant posts, retrying on 429 with backoff."""
     _mark_zero_comment_posts()
 
     run_id = start_run("initial_collection", "comment_fetch")
@@ -121,11 +124,12 @@ def run_comment_collection():
         for post_id in post_ids:
             try:
                 comments = fetch_comments_for_post(post_id)
+
                 if comments is None:
-                    # API failure (429, network error) — skip, don't mark
                     failed += 1
-                    time.sleep(5)  # back off on failure
+                    time.sleep(5)
                     continue
+
                 if comments:
                     inserted = insert_comments_batch(comments)
                     total_comments += inserted
@@ -145,6 +149,7 @@ def run_comment_collection():
             time.sleep(REDDIT_REQUEST_DELAY)
 
     finish_run(run_id, total_posts, total_posts - failed, failed)
+
     log.info(
         f"Comment collection complete. {total_posts} posts, "
         f"{total_comments} comments, {failed} failures"

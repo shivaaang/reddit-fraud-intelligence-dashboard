@@ -101,6 +101,28 @@ IDV_ONLY precision improved (the background check and 2FA exclusions helped), bu
 
 The LLM has a precision ceiling around 80–85% for boolean routing at this prompt complexity. Recall is excellent (97%+). The ~15–20% false positive rate is acceptable because Pass 2 has its own `is_relevant` field that filters these out during deep classification.
 
+### Pass 1b: IDV-Only Classifier (Enhanced Tiers)
+
+Posts from enhanced collection tiers 13–21 were gathered via IDV-targeted keyword searches (gaming age verification, crypto KYC, social media IDV, etc.). Since they only needed IDV classification — not the dual fraud/IDV routing — a separate, focused classifier was built.
+
+**Model:** DeepSeek V3.2 via OpenRouter, `reasoning: none`, 30 concurrent workers. Output: `{"is_idv": true/false, "confidence": 0.0-1.0}`.
+
+**Key differences from the original Pass 1 prompt:**
+
+1. **Single flag:** Only classifies `is_idv`, not `is_fraud`. The enhanced tiers targeted IDV content specifically, so fraud routing wasn't needed.
+2. **More aggressive exclusions:** Since every post in these tiers already contains verification keywords (they were collected via keyword search), the classifier needed stronger exclusions to filter noise:
+   - Business/page/creator verification (social media blue checkmarks, monetization verification)
+   - Email or phone verification during signup (routine step, not IDV)
+   - Colloquial "verify" ("can someone verify this?")
+   - Account deactivation for non-identity reasons (low ratings, policy violations)
+   - India-specific government identity infrastructure (Aadhaar-PAN linking, EPFO, DigiLocker)
+   - Anti-cheat systems, game bans, content moderation unrelated to IDV
+3. **No structured output schema:** Uses `json_object` format instead of `json_schema` — sufficient for a simple two-field response.
+
+**Result:** 8,779 posts processed. 4,235 classified as IDV-relevant (48.3%). Combined with original tiers: 14,595 total IDV-flagged.
+
+The ~48% IDV rate (vs ~26% in original tiers) confirms the enhanced tier keyword targeting was effective — nearly half the posts from IDV-specific subreddit searches were substantive IDV discussions.
+
 ---
 
 ## Pass 2: Deep Classification
@@ -197,4 +219,4 @@ Before running the full classification, tested DeepSeek's reasoning modes on 50 
 
 ~30% of Pass 1 positives were marked `is_relevant = false` by Pass 2 — confirming the expected false positive rate from Pass 1's 80–85% precision. The `is_relevant` field allows the dashboard to show only substantive posts while preserving the full classified dataset.
 
-Final counts: 8,739 fraud-relevant posts and 7,720 IDV-relevant posts with full structured classification.
+Final counts: 8,739 fraud-relevant posts and 11,737 IDV-relevant posts with full structured classification.

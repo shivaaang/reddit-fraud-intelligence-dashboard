@@ -2,8 +2,6 @@
 
 An analysis of 49,000+ Reddit posts about fraud, scams, and identity verification — structured into a queryable dataset for product intelligence.
 
-Built as a showcase project for Persona (identity verification infrastructure).
-
 ## What This Is
 
 A data pipeline that collects Reddit posts discussing fraud and identity verification, then classifies them using LLMs into structured fields (fraud type, industry, loss bracket, verification method, friction type, etc.). The result is a dataset that answers questions like:

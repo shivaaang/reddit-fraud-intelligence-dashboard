@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* UBE (Indigo-Lavender) Family */
+  --color-ube-100: #e9eaff;
+  --color-ube-150: #dee0ff;
+  --color-ube-200: #d3d5ff;
+  --color-ube-300: #bec0fe;
+  --color-ube-400: #878cfe;
+  --color-ube-600: #878cfe;
+  --color-ube-1000: #010668;
+  --color-ube-1100: #010334;
+
+  /* FOG (Gray) Family */
+  --color-fog-100: #f6f6f6;
+  --color-fog-200: #f2f2f2;
+  --color-fog-300: #d4d4d4;
+  --color-fog-400: #b4b4b4;
+  --color-fog-500: #787878;
+  --color-fog-600: #5a5a5a;
+  --color-fog-700: #3c3c3c;
+  --color-fog-800: #2b2b2b;
+  --color-fog-900: #1e1e1e;
+
+  /* Accent Colors */
+  --color-accent-mint: #b7efda;
+
+  /* Chart Colors */
+  --color-chart-primary: #878cfe;
+  --color-chart-secondary: #bec0fe;
+  --color-chart-muted: #d3d5ff;
+  --color-chart-emphasis: #010668;
+  --color-chart-warning: #e5484d;
+
+  /* Semantic tokens */
+  --color-background: #ffffff;
+  --color-foreground: #2b2b2b;
+  --color-muted: #f6f6f6;
+  --color-muted-foreground: #787878;
+  --color-border: #d4d4d4;
+  --color-ring: #878cfe;
+
+  /* Font */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Brand-colored text selection */
+::selection {
+  background: #dee0ff;
+  color: #010334;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f6f6f6;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b4b4b4;
+}
+
+/* Modal entrance animation */
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-enter {
+  animation: modal-enter 0.2s ease-out;
+}
+
+/* Drill-down panel animations */
+@keyframes panel-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+.panel-enter {
+  animation: panel-slide-in 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.panel-exit {
+  animation: panel-slide-out 200ms cubic-bezier(0.4, 0, 1, 1);
+}

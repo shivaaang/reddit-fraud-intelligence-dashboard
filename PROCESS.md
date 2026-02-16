@@ -9,7 +9,7 @@ This documents the key decisions, experiments, and lessons from building the fra
 **Why Reddit?** Fraud victims post detailed first-person accounts — what happened, how much they lost, which platform was involved, and whether identity verification could have stopped it. No other public source has this density of structured fraud narratives.
 
 **Collection strategy:** 21 search tiers in two phases:
-- **Tiers 1–12 (original):** High-density fraud subreddits (r/Scams, r/identitytheft) → keyword searches across fintech, government, dating, gambling verticals → global cross-Reddit queries → Persona competitors and privacy concerns. ~40,300 posts.
+- **Tiers 1–12 (original):** High-density fraud subreddits (r/Scams, r/identitytheft) → keyword searches across fintech, government, dating, gambling verticals → global cross-Reddit queries → IDV company comparisons and privacy concerns. ~40,300 posts.
 - **Tiers 13–21 (enhanced, IDV-focused):** Targeted subreddit-specific searches for identity verification content — social media IDV (Facebook, Instagram), gaming age verification (Roblox, CharacterAI), expanded gig economy, crypto KYC, freelancing platforms, financial IDV, and AI/tech platform verification. ~9,200 additional posts.
 
 The enhanced tiers were added after initial analysis showed the IDV dataset was underrepresenting certain verticals (gaming, social media, crypto KYC). These tiers use subreddit-restricted keyword searches to collect posts that mention verification terms within specific communities.

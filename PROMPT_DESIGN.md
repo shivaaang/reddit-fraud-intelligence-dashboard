@@ -151,7 +151,7 @@ Model: `deepseek/deepseek-v3.2` via OpenRouter with `json_object` response forma
 
 - `identity_theft` vs `account_takeover` — identity theft is about stealing personal information to open *new* accounts; account takeover is about hijacking *existing* accounts. Reddit posts frequently blur this line.
 - `business_impersonation` vs `phishing` — business_impersonation is pretending to be a real company (tech support scams, IRS impersonation); phishing is the delivery mechanism (fake links). A tech support scam delivered via phone is business_impersonation, not phishing.
-- `document_forgery` — included because it's directly relevant to Persona's product (identity document verification). Fake IDs, passports, and diplomas are a category that identity verification can directly prevent.
+- `document_forgery` — included because it's directly relevant to identity verification. Fake IDs, passports, and diplomas are a category that identity verification can directly prevent.
 
 **`industry` (13 values):** Where fraud occurs, mapped to platform categories that appear most frequently in the Reddit data. `fintech` is separated from `banking` because the fraud patterns are different — PayPal/Venmo/CashApp scams look nothing like traditional bank fraud.
 
@@ -161,7 +161,7 @@ Model: `deepseek/deepseek-v3.2` via OpenRouter with `json_object` response forma
 
 ### IDV Taxonomy
 
-This is the taxonomy most relevant to Persona's product. The fields are designed to answer: what verification methods cause friction, what kind of friction, and on which platforms.
+The fields are designed to answer: what verification methods cause friction, what kind of friction, and on which platforms.
 
 **`verification_type` (8 values):** The primary verification method discussed. Key design decisions:
 

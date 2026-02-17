@@ -96,7 +96,7 @@ export function DrillDownPosts({
                 r/{post.subreddit}
               </span>
               <span>&middot;</span>
-              <span>Score: {post.score}</span>
+              <span>Upvotes: {post.score}</span>
               <span>&middot;</span>
               <span>{post.numComments}c</span>
               <span>&middot;</span>

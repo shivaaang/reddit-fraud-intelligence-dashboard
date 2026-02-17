@@ -150,7 +150,7 @@ export function PostsModal({ isOpen, onClose, title, filters }: PostsModalProps)
                     Title
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-fog-500 uppercase tracking-wider">
-                    Score
+                    Upvotes
                   </th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-fog-500 uppercase tracking-wider">
                     Link

@@ -2,14 +2,15 @@ import { SectionHeader } from "@/components/shared/section-header";
 import { SectionTransition } from "@/components/shared/section-transition";
 import { TakeawayCard } from "@/components/shared/takeaway-card";
 import { RecommendationsSection } from "@/components/shared/recommendations-section";
+import { CrossTabTeaserFraud } from "@/components/shared/cross-tab-teaser-fraud";
 import { HeroZone } from "@/components/shared/hero-zone";
 import { IdvKPIStrip } from "@/components/idv/idv-kpi-strip";
 import { FrictionTypeChart } from "@/components/idv/friction-type-chart";
 import { VerificationBars } from "@/components/idv/verification-bars";
 import { TriggerReasonChart } from "@/components/idv/trigger-reason-chart";
 import { PlatformFrictionChart } from "@/components/idv/platform-friction-chart";
+import { IdvTags } from "@/components/idv/idv-tags";
 import { IdvInsightCards } from "@/components/idv/idv-insight-cards";
-import { IdvVoices } from "@/components/idv/idv-voices";
 import { LivenessCallout } from "@/components/idv/liveness-callout";
 
 import {
@@ -19,7 +20,7 @@ import {
   getVerificationTypeDistribution,
   getTriggerReasonDistribution,
   getPlatformFriction,
-  getIdvQuotes,
+  getIdvTags,
   getIdvInsightData,
 } from "@/lib/queries/idv";
 
@@ -31,7 +32,7 @@ export async function IdvTab() {
     verificationTypes,
     triggerReasons,
     platformFriction,
-    quotes,
+    tags,
     insightData,
   ] = await Promise.all([
     getIdvKPIs(),
@@ -40,7 +41,7 @@ export async function IdvTab() {
     getVerificationTypeDistribution(),
     getTriggerReasonDistribution(),
     getPlatformFriction(),
-    getIdvQuotes(),
+    getIdvTags(),
     getIdvInsightData(),
   ]);
 
@@ -56,15 +57,15 @@ export async function IdvTab() {
       {/* KPI Strip */}
       <IdvKPIStrip kpis={idvKpis} />
 
-      <SectionTransition text="What exactly goes wrong during verification, and which methods cause the most friction?" />
+      <SectionTransition text="What goes wrong during verification, and which methods cause the most friction?" />
 
       {/* Charts Row: Friction Types + Verification Methods */}
-      <section className="grid grid-cols-2 gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <SectionHeader
             title="Friction Type Breakdown"
             subtitle="What goes wrong during identity verification"
-            annotation="False rejection dwarfs every other friction type. This is the core tension: every rejected legitimate user is a potential customer lost."
+            annotation="False rejection is the leading friction type by a significant margin. This is the core tension in modern IDV: every incorrectly rejected user is a potential customer lost."
           />
           <FrictionTypeChart data={frictionTypes} />
         </div>
@@ -72,7 +73,7 @@ export async function IdvTab() {
           <SectionHeader
             title="Verification Methods"
             subtitle="Distribution of verification types encountered"
-            annotation="Biometric methods (selfie, liveness, facial age estimation) are color-coded separately. These represent the most technically demanding verification steps."
+            annotation="Biometric methods (selfie, liveness, facial age estimation) appear in a significant share of friction discussions despite being one part of the verification stack. The technical complexity of face-matching creates disproportionate failure points."
           />
           <VerificationBars data={verificationTypes} />
         </div>
@@ -97,34 +98,34 @@ export async function IdvTab() {
         <SectionHeader
           title="Platform Friction Leaderboard"
           subtitle="Top 10 platforms by IDV discussion volume, with their primary friction type"
-          annotation="Each platform's top friction type reveals its specific IDV failure mode. False rejection dominates: legitimate users locked out of their own accounts."
+          annotation="Each platform's dominant friction type reveals a distinct failure mode. Notice how gig platforms cluster around reverification, while financial platforms concentrate on new-account onboarding friction."
         />
         <PlatformFrictionChart data={platformFriction} />
       </section>
 
-      <SectionTransition text="Three emerging patterns that signal where IDV is heading →" />
+      <SectionTransition text="Beneath the categories, recurring themes emerge across thousands of posts" />
+
+      {/* IDV Tags */}
+      <section>
+        <SectionHeader
+          title="Verification Signal Tags"
+          subtitle="Recurring themes and patterns extracted from IDV discussions"
+        />
+        <IdvTags data={tags} />
+      </section>
+
+      <SectionTransition text="Three patterns that define where IDV friction concentrates" />
 
       {/* Insight Story Cards */}
       <section>
         <SectionHeader
-          title="Emerging Patterns"
-          subtitle="Three signals shaping the IDV landscape"
+          title="Friction Frontiers"
+          subtitle="Three patterns shaping the IDV landscape"
         />
         <IdvInsightCards data={insightData} />
       </section>
 
-      <SectionTransition text="The data tells one story. The users tell another." />
-
-      {/* User Voices */}
-      <section>
-        <SectionHeader
-          title="From the Front Lines"
-          subtitle="What real users say when verification fails them"
-        />
-        <IdvVoices quotes={quotes} />
-      </section>
-
-      {/* Liveness Callout */}
+      {/* Biometric Verification Callout */}
       <section>
         <LivenessCallout
           livenessCount={insightData.livenessCount}
@@ -132,32 +133,35 @@ export async function IdvTab() {
         />
       </section>
 
-      {/* Executive Takeaway */}
+      {/* Cross-Tab Bridge → Fraud */}
+      <CrossTabTeaserFraud />
+
+      {/* Key Findings */}
       <TakeawayCard
-        title="What the data tells us"
+        title="Key Findings"
         points={[
-          "False rejection is the #1 problem. Legitimate users are being locked out at scale, and every false rejection risks losing a real customer.",
-          "The vast majority of IDV discussions carry negative sentiment, signaling a massive UX gap between what verification systems demand and what users will tolerate.",
-          "Age verification and gig worker identity checks represent two fast-growing friction frontiers where the balance between compliance and user experience is most acute.",
+          "False rejection dominates across every dimension: friction type, platform, and sentiment. It's not a niche technical issue; it's the defining failure mode of modern identity verification, and every occurrence risks permanently losing a real customer.",
+          `${Math.round(idvKpis.negativeSentimentPercent)}% of IDV discussions carry negative sentiment, but the nature of that negativity varies by context. New account verification generates resignation; reverification triggers frustration; false rejection produces outrage. The emotional intensity of friction matters as much as its frequency.`,
+          "Age verification and gig worker reverification are two major friction frontiers where compliance requirements and user tolerance are on a direct collision course, and where privacy resistance is beginning to compound the challenge.",
         ]}
       />
 
-      {/* Opportunities for IDV Providers */}
+      {/* Strategic Implications */}
       <RecommendationsSection
-        title="Opportunities for IDV Providers"
+        title="Strategic Implications"
         cards={[
           {
             headline: "Reduce False Rejections",
             dataPoint:
-              "False rejection is the dominant friction type. Legitimate users are being told they're not who they say they are.",
+              "Users describe being told they're not who they say they are, rejected despite submitting valid documents. The emotional and practical cost compounds with every false negative.",
             recommendation:
-              "Improving document parsing, supporting name variants and non-Latin scripts, and better face-matching across appearance changes would recapture legitimate users currently being locked out.",
+              "Improving document parsing, supporting name variants and non-Latin scripts, and better face-matching across appearance changes would recapture users currently being turned away.",
             accentColor: "#e5484d",
           },
           {
             headline: "Adaptive Verification for Gig Platforms",
             dataPoint:
-              "Gig platforms show the highest reverification friction. Drivers and couriers face repeated identity checks that interrupt their livelihood.",
+              "Gig platforms are among the most-discussed for verification friction, and unlike other platforms, failed checks have immediate economic consequences for workers who can't earn during downtime.",
             recommendation:
               "Adaptive risk scoring could reduce unnecessary re-checks while maintaining security, reserving full reverification for genuinely suspicious activity.",
             accentColor: "#878cfe",
@@ -165,7 +169,7 @@ export async function IdvTab() {
           {
             headline: "Fallback Verification Paths",
             dataPoint:
-              "Many posts describe being locked out with no alternative method, a single point of failure in the verification flow.",
+              "When automated verification fails, users describe hitting a dead end: no fallback method, no escalation path, no manual review option. A single point of failure in the verification flow.",
             recommendation:
               "Offering fallback verification paths (manual review, alternative document types, video-assisted verification) prevents permanent lockout and recovers users that automated systems reject.",
             accentColor: "#010668",
@@ -173,9 +177,9 @@ export async function IdvTab() {
           {
             headline: "Age Verification at Scale",
             dataPoint:
-              "Age verification is a growing compliance wave, with platforms rapidly rolling out age estimation and document checks.",
+              "Regulatory mandates are driving age verification adoption beyond gaming and social media into new verticals, faster than purpose-built solutions can keep up.",
             recommendation:
-              "Facial age estimation that balances compliance requirements with minimal false rejection for legitimate users is a fast-growing product opportunity, especially as age gates expand beyond gaming and social media.",
+              "Facial age estimation that minimizes false rejection for real users, especially younger demographics without traditional ID, is a significant product opportunity as age gates expand across industries.",
             accentColor: "#bec0fe",
           },
         ]}

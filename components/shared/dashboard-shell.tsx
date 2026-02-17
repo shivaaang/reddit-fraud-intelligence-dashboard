@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, type ReactNode } from "react";
-import { Shield, Fingerprint, Github } from "lucide-react";
-import Image from "next/image";
-import { MethodologySection } from "./methodology-section";
+import { Shield, Fingerprint, Github, DatabaseZap } from "lucide-react";
+import { PipelineModal } from "./pipeline-modal";
 
 interface DashboardShellProps {
   fraudTab: ReactNode;
@@ -12,6 +11,7 @@ interface DashboardShellProps {
 
 export function DashboardShell({ fraudTab, idvTab }: DashboardShellProps) {
   const [activeTab, setActiveTab] = useState<"fraud" | "idv">("idv");
+  const [pipelineOpen, setPipelineOpen] = useState(false);
 
   useEffect(() => {
     function handleTabSwitch(e: Event) {
@@ -37,35 +37,32 @@ export function DashboardShell({ fraudTab, idvTab }: DashboardShellProps) {
               Intelligence Dashboard
             </p>
             <h1 className="text-3xl font-bold tracking-tight">
-              Fraud & Identity Verification Landscape
+              Reddit Identity Verification & Fraud Landscape
             </h1>
             <p className="text-white/75 mt-2 text-base">
-              What 40,000+ public Reddit posts reveal about fraud and identity
-              verification · January 2025 onwards
+              What 40,000+ public Reddit posts reveal about identity
+              verification and fraud · January 2025 onwards
             </p>
           </div>
 
-          <div className="flex items-center gap-5 pt-1">
-            <div className="flex items-center gap-2.5 opacity-80">
-              <Image
-                src="/reddit-logo.svg"
-                alt="Reddit"
-                width={28}
-                height={28}
-              />
-              <span className="text-xs font-medium text-white/80 uppercase tracking-widest whitespace-nowrap">
-                Reddit Data Pipeline
+          <div className="flex flex-col gap-2.5 pt-1 w-[180px]">
+            <button
+              onClick={() => setPipelineOpen(true)}
+              className="flex items-center justify-center gap-2.5 w-full px-5 py-2.5 rounded-lg border border-white/30 bg-white/10 hover:bg-white/20 text-white transition-colors"
+            >
+              <DatabaseZap className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-semibold whitespace-nowrap">
+                View Pipeline
               </span>
-            </div>
-            <div className="w-px h-6 bg-white/20" />
+            </button>
             <a
               href="https://github.com/shivaaang/reddit-fraud-intelligence-dashboard"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
+              className="flex items-center justify-center gap-2.5 w-full px-5 py-2.5 rounded-lg border border-white/30 bg-white/10 hover:bg-white/20 text-white transition-colors"
             >
-              <Github className="w-5 h-5" />
-              <span className="text-xs font-medium uppercase tracking-widest">
+              <Github className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-semibold whitespace-nowrap">
                 GitHub
               </span>
             </a>
@@ -80,7 +77,7 @@ export function DashboardShell({ fraudTab, idvTab }: DashboardShellProps) {
               className={`flex items-center gap-2 px-5 py-3 rounded-t-lg text-sm font-semibold transition-colors ${
                 activeTab === "idv"
                   ? "bg-white text-ube-1000 shadow-sm"
-                  : "text-white/60 hover:text-white hover:bg-white/10"
+                  : "text-white/80 border border-white/20 hover:text-white hover:bg-white/10"
               }`}
             >
               <Fingerprint className="w-4 h-4" />
@@ -91,7 +88,7 @@ export function DashboardShell({ fraudTab, idvTab }: DashboardShellProps) {
               className={`flex items-center gap-2 px-5 py-3 rounded-t-lg text-sm font-semibold transition-colors ${
                 activeTab === "fraud"
                   ? "bg-white text-ube-1000 shadow-sm"
-                  : "text-white/60 hover:text-white hover:bg-white/10"
+                  : "text-white/80 border border-white/20 hover:text-white hover:bg-white/10"
               }`}
             >
               <Shield className="w-4 h-4" />
@@ -117,9 +114,13 @@ export function DashboardShell({ fraudTab, idvTab }: DashboardShellProps) {
             Two-pass classification pipeline · Structured across type,
             industry, channel, platform, and sentiment
           </p>
-          <MethodologySection />
         </div>
       </footer>
+
+      <PipelineModal
+        open={pipelineOpen}
+        onClose={() => setPipelineOpen(false)}
+      />
     </div>
   );
 }

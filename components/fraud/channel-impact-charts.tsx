@@ -77,7 +77,7 @@ export function ChannelImpactCharts({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Channel Distribution */}
         <div className="bg-white rounded-xl border border-fog-200 shadow-sm p-6">
           <h3 className="text-sm font-semibold text-fog-600 uppercase tracking-wider mb-4">
@@ -109,7 +109,7 @@ export function ChannelImpactCharts({
                     displayName: string;
                   };
                   return (
-                    <div className="bg-white border border-fog-200 shadow-sm rounded-lg px-3 py-2 shadow-lg">
+                    <div className="bg-white border border-fog-200 rounded-lg px-3 py-2 shadow-lg">
                       <p className="text-sm font-medium text-fog-800">
                         {item.displayName}
                       </p>
@@ -183,7 +183,7 @@ export function ChannelImpactCharts({
                     displayName: string;
                   };
                   return (
-                    <div className="bg-white border border-fog-200 shadow-sm rounded-lg px-3 py-2 shadow-lg">
+                    <div className="bg-white border border-fog-200 rounded-lg px-3 py-2 shadow-lg">
                       <p className="text-sm font-medium text-fog-800">
                         {item.displayName}
                       </p>

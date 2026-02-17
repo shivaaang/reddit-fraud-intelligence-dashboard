@@ -170,40 +170,6 @@ export async function getIdvTags() {
   }));
 }
 
-// ── Notable Quotes ───────────────────────────────────────────
-
-export async function getIdvQuotes() {
-  const sql = getDb();
-
-  // Ranked by score within each friction type to ensure diversity on frontend
-  const rows = await sql`
-    WITH ranked AS (
-      SELECT ic.notable_quote, ic.friction_type, ic.platform_name, rp.subreddit, rp.score,
-             ROW_NUMBER() OVER (PARTITION BY ic.friction_type ORDER BY rp.score DESC) as rn
-      FROM idv_classifications ic
-      JOIN raw_posts rp ON ic.post_id = rp.post_id
-      WHERE ic.is_relevant = true
-        AND ic.notable_quote IS NOT NULL
-        AND LENGTH(ic.notable_quote) > 50
-        AND LENGTH(ic.notable_quote) < 300
-        AND rp.score > 3
-    )
-    SELECT notable_quote, friction_type, platform_name, subreddit, score
-    FROM ranked
-    WHERE rn <= 3
-    ORDER BY score DESC
-    LIMIT 30
-  `;
-
-  return rows.map((r) => ({
-    quote: r.notable_quote as string,
-    frictionType: r.friction_type as string,
-    platform: r.platform_name as string | null,
-    subreddit: r.subreddit as string,
-    score: Number(r.score),
-  }));
-}
-
 // ── Hero Zone Stats ─────────────────────────────────────────
 
 export async function getIdvHeroStats() {
@@ -238,7 +204,7 @@ export async function getIdvInsightData() {
     FROM idv_classifications ic,
     LATERAL jsonb_array_elements_text(ic.tags) as tag
     WHERE ic.is_relevant = true
-      AND (tag ILIKE '%age%' OR ic.trigger_reason = 'age_gate')
+      AND ((tag ILIKE 'age%' OR tag ILIKE '%_age' OR tag ILIKE '%_age_%' OR tag ILIKE '%age_%' OR tag = 'underage' OR tag ILIKE '%underage%') OR ic.trigger_reason = 'age_gate')
   `;
 
   // Gig worker count
@@ -280,6 +246,20 @@ export async function getIdvInsightData() {
     ORDER BY count DESC
   `;
 
+  // Privacy concern count
+  const [privacyRow] = await sql`
+    SELECT COUNT(*) as count
+    FROM idv_classifications
+    WHERE is_relevant = true AND friction_type = 'privacy_concern'
+  `;
+
+  // No alternative method count
+  const [noAltRow] = await sql`
+    SELECT COUNT(*) as count
+    FROM idv_classifications
+    WHERE is_relevant = true AND friction_type = 'no_alternative_method'
+  `;
+
   const total = Number(totalRow.count);
 
   return {
@@ -292,6 +272,9 @@ export async function getIdvInsightData() {
       type: r.verification_type as string,
       count: Number(r.count),
     })),
+    privacyConcernCount: Number(privacyRow.count),
+    privacyConcernPercent: total > 0 ? (Number(privacyRow.count) / total) * 100 : 0,
+    noAlternativeCount: Number(noAltRow.count),
     total,
   };
 }

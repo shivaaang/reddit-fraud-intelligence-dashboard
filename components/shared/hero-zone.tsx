@@ -30,7 +30,9 @@ export function HeroZone({ type, totalPosts, topSubreddits }: HeroZoneProps) {
             <span className="text-2xl font-bold text-fog-900">
               {formatNumber(totalPosts)}
             </span>{" "}
-            {description}, collected from January 2025 onwards.
+            {description}, collected from January 2025 onwards. Each relevant
+            post was classified alongside its top community responses to capture
+            discussion context beyond the original post.
           </p>
         </div>
 

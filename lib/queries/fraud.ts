@@ -226,40 +226,6 @@ export async function getFraudTags() {
   }));
 }
 
-// ── Notable Quotes ───────────────────────────────────────────
-
-export async function getFraudQuotes() {
-  const sql = getDb();
-
-  // Fetch top quotes with diversity: rank by score within each fraud type,
-  // then take top 3 per type to ensure diverse selection on the frontend
-  const rows = await sql`
-    WITH ranked AS (
-      SELECT fc.notable_quote, fc.fraud_type, rp.subreddit, rp.score,
-             ROW_NUMBER() OVER (PARTITION BY fc.fraud_type ORDER BY rp.score DESC) as rn
-      FROM fraud_classifications fc
-      JOIN raw_posts rp ON fc.post_id = rp.post_id
-      WHERE fc.is_relevant = true
-        AND fc.notable_quote IS NOT NULL
-        AND LENGTH(fc.notable_quote) > 50
-        AND LENGTH(fc.notable_quote) < 300
-        AND rp.score > 5
-    )
-    SELECT notable_quote, fraud_type, subreddit, score
-    FROM ranked
-    WHERE rn <= 3
-    ORDER BY score DESC
-    LIMIT 30
-  `;
-
-  return rows.map((r) => ({
-    quote: r.notable_quote as string,
-    fraudType: r.fraud_type as string,
-    subreddit: r.subreddit as string,
-    score: Number(r.score),
-  }));
-}
-
 // ── Hero Zone Stats ─────────────────────────────────────────
 
 export async function getFraudHeroStats() {
@@ -289,12 +255,64 @@ export async function getAiThreatCount() {
   const sql = getDb();
 
   const [row] = await sql`
+    SELECT COUNT(*) as count FROM (
+      SELECT DISTINCT fc.post_id
+      FROM fraud_classifications fc
+      LEFT JOIN LATERAL jsonb_array_elements_text(fc.tags) as tag ON true
+      WHERE fc.is_relevant = true
+        AND (fc.fraud_type = 'deepfake_ai'
+             OR tag IN ('deepfake', 'ai_generated', 'ai_voice', 'ai_scam', 'voice_cloning', 'synthetic_identity'))
+    ) sub
+  `;
+
+  return Number(row.count);
+}
+
+// ── Insight Cards Data ──────────────────────────────────────
+
+export async function getFraudInsightData() {
+  const sql = getDb();
+
+  // Recovery void: posts about failed recovery, no recourse, support failures
+  const [recoveryRow] = await sql`
     SELECT COUNT(DISTINCT fc.post_id) as count
     FROM fraud_classifications fc,
     LATERAL jsonb_array_elements_text(fc.tags) as tag
     WHERE fc.is_relevant = true
-      AND tag IN ('deepfake', 'ai_generated', 'ai_voice', 'ai_scam', 'voice_cloning', 'ai')
+      AND tag IN ('no_recourse', 'support_failure', 'chargeback', 'recovery', 'bank_refused', 'frozen_account', 'account_locked', 'customer_support', 'refund', 'dispute', 'bank_response', 'platform_response', 'negligence', 'complaint')
   `;
 
-  return Number(row.count);
+  // Social engineering: phishing, romance scams, manipulation-based fraud
+  const [socialEngRow] = await sql`
+    SELECT COUNT(DISTINCT fc.post_id) as count
+    FROM fraud_classifications fc
+    WHERE fc.is_relevant = true
+      AND (fc.fraud_type IN ('social_engineering', 'romance_scam', 'phishing')
+           OR EXISTS (
+             SELECT 1 FROM jsonb_array_elements_text(fc.tags) as tag
+             WHERE tag IN ('social_engineering', 'phishing', 'romance', 'pig_butchering', 'impersonation', 'catfishing', 'pretexting', 'baiting', 'vishing', 'smishing')
+           ))
+  `;
+
+  // Organized crime signals: coordinated, cross-border, syndicate operations
+  const [organizedRow] = await sql`
+    SELECT COUNT(DISTINCT fc.post_id) as count
+    FROM fraud_classifications fc,
+    LATERAL jsonb_array_elements_text(fc.tags) as tag
+    WHERE fc.is_relevant = true
+      AND tag IN ('organized', 'sophisticated', 'cross_border', 'ring', 'coordinated', 'syndicate', 'mule', 'money_mule', 'high_volume', 'international')
+  `;
+
+  const [totalRow] = await sql`
+    SELECT COUNT(*) as count
+    FROM fraud_classifications
+    WHERE is_relevant = true
+  `;
+
+  return {
+    recoveryVoidCount: Number(recoveryRow.count),
+    socialEngineeringCount: Number(socialEngRow.count),
+    organizedCrimeCount: Number(organizedRow.count),
+    total: Number(totalRow.count),
+  };
 }

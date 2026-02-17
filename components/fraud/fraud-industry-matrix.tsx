@@ -110,7 +110,7 @@ export function FraudIndustryMatrix({ data }: FraudIndustryMatrixProps) {
                               : "#d4d4d4",
                       }}
                     >
-                      {count > 0 ? count : "\u2014"}
+                      {count > 0 ? count : "-"}
                     </td>
                   );
                 })}

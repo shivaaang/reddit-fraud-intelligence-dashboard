@@ -13,9 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fraud & IDV Intelligence Dashboard",
+  title: "Reddit Identity Verification & Fraud Landscape",
   description:
-    "Fraud landscape and identity verification friction intelligence from 40,000+ Reddit posts",
+    "Identity verification and fraud landscape intelligence from 40,000+ Reddit posts",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -1,12 +1,14 @@
 "use client";
 
-import { formatNumber, formatPercent } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
 interface InsightData {
   ageVerificationCount: number;
   gigWorkerCount: number;
   falseRejectionCount: number;
   falseRejectionPercent: number;
+  privacyConcernCount: number;
+  noAlternativeCount: number;
   livenessCount: number;
   biometricBreakdown: { type: string; count: number }[];
   total: number;
@@ -35,17 +37,17 @@ export function IdvInsightCards({ data }: IdvInsightCardsProps) {
       borderColor: "#878cfe",
     },
     {
-      title: "False Rejection Crisis",
-      stat: formatPercent(data.falseRejectionPercent),
-      statLabel: "of all IDV posts",
+      title: "Privacy & Consent Resistance",
+      stat: formatNumber(data.privacyConcernCount),
+      statLabel: "privacy-concern posts",
       narrative:
-        "Legitimate users are being locked out of their own accounts. False rejections erode trust and push users toward workarounds that weaken security posture.",
-      borderColor: "#e5484d", // chart-warning
+        "Users are pushing back against handing over government IDs and biometric data. As data protection regulations tighten globally, balancing thorough verification with user consent is becoming a defining challenge.",
+      borderColor: "#010668",
     },
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {cards.map((card) => (
         <div
           key={card.title}

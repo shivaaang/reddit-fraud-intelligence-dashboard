@@ -19,9 +19,9 @@ const CATCHALL = new Set(["other", "unknown", "unspecified", "none"]);
 const LOSS_LABELS: Record<string, string> = {
   none: "No Loss",
   under_100: "Under $100",
-  "100_to_1k": "$100–$1K",
-  "1k_to_10k": "$1K–$10K",
-  "10k_to_100k": "$10K–$100K",
+  "100_to_1k": "$100-$1K",
+  "1k_to_10k": "$1K-$10K",
+  "10k_to_100k": "$10K-$100K",
   over_100k: "Over $100K",
   unspecified: "Unspecified",
 };
